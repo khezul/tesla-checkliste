@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tesla Zeitplan</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --red:#E31937; --dark:#0a0a0a; --card:#111; --border:#222; --text:#f0f0f0; --muted:#777; --green:#00e676; --amber:#ffb300; --mono:'Space Mono',monospace; --sans:'Syne',sans-serif; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--dark); color:var(--text); font-family:var(--sans); min-height:100vh; padding:24px 16px 60px; }
+  .wrap { max-width:640px; margin:0 auto; }
+  .header { text-align:center; margin-bottom:28px; }
+  .logo { font-size:11px; letter-spacing:0.3em; color:var(--red); font-family:var(--mono); text-transform:uppercase; margin-bottom:12px; }
+  h1 { font-size:clamp(2rem,8vw,3.2rem); font-weight:800; line-height:1; letter-spacing:-0.03em; }
+  h1 span { color:var(--red); }
+  .subtitle { font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:10px; }
+
+  .tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:20px; }
+  .tab { background:var(--card); border:1px solid var(--border); color:var(--muted); font-family:var(--sans); font-weight:700; font-size:14px; padding:12px; border-radius:12px; cursor:pointer; }
+  .tab.active { color:var(--text); border-color:var(--red); }
+
+  .card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px 16px; margin-bottom:16px; }
+  .total { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+  .total-num { font-family:var(--mono); font-size:26px; font-weight:700; color:var(--red); }
+  .total-lbl { font-family:var(--mono); font-size:11px; color:var(--muted); }
+  .bar { height:6px; background:#1c1c1c; border-radius:3px; overflow:hidden; }
+  .bar > div { height:100%; background:var(--red); width:0; transition:width .3s; }
+  .bar.done > div { background:var(--green); }
+  .next { font-family:var(--mono); font-size:11px; color:var(--muted); margin-top:12px; line-height:1.5; }
+  .next b { color:var(--text); font-weight:400; }
+
+  .phase-head { display:flex; justify-content:space-between; align-items:center; gap:10px; cursor:pointer; user-select:none; }
+  .phase-title { font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; }
+  .phase-title::before { content:''; display:block; width:3px; height:15px; background:var(--red); border-radius:2px; flex-shrink:0; }
+  .phase.complete .phase-title::before { background:var(--green); }
+  .phase-meta { font-family:var(--mono); font-size:11px; color:var(--muted); white-space:nowrap; }
+  .phase-goal { font-family:var(--mono); font-size:11px; color:var(--muted); margin:8px 0 10px 11px; line-height:1.5; }
+  .phase .bar { margin:8px 0 4px; }
+  .phase.collapsed .phase-body { display:none; }
+  .chev { transition:transform .2s; display:inline-block; color:var(--muted); }
+  .phase.collapsed .chev { transform:rotate(-90deg); }
+
+  .item { display:flex; gap:12px; align-items:flex-start; padding:11px 0; border-top:1px solid #1a1a1a; cursor:pointer; }
+  .item:first-child { border-top:none; }
+  .box { width:22px; height:22px; border:2px solid #444; border-radius:6px; flex-shrink:0; margin-top:1px; display:flex; align-items:center; justify-content:center; transition:all .15s; }
+  .item.checked .box { background:var(--green); border-color:var(--green); }
+  .item.checked .box::after { content:''; width:6px; height:11px; border:solid #0a0a0a; border-width:0 2.5px 2.5px 0; transform:rotate(45deg) translate(-1px,-1px); }
+  .item-text { font-size:14px; line-height:1.4; }
+  .item.checked .item-text { color:var(--muted); text-decoration:line-through; text-decoration-color:#444; }
+  .item-sub { font-family:var(--mono); font-size:11px; color:var(--muted); margin-top:4px; line-height:1.5; text-decoration:none; }
+  .item.warn .item-text::before { content:'! '; color:var(--amber); font-weight:800; }
+  .del { margin-left:auto; background:none; border:none; color:#444; font-size:18px; cursor:pointer; padding:0 4px; }
+  .del:hover { color:var(--red); }
+
+  .add { display:flex; gap:8px; margin-top:10px; }
+  .add input { flex:1; background:#0a0a0a; border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:var(--sans); font-size:13px; padding:9px 10px; outline:none; min-width:0; }
+  .add input:focus { border-color:var(--red); }
+  .add button, .btn { background:var(--red); border:none; color:#fff; font-family:var(--sans); font-weight:700; font-size:13px; padding:9px 14px; border-radius:8px; cursor:pointer; }
+  .btn.ghost { background:transparent; border:1px solid var(--border); color:var(--muted); }
+
+  .date-row { display:flex; align-items:center; justify-content:space-between; gap:10px; font-family:var(--mono); font-size:11px; color:var(--muted); margin-top:12px; }
+  .date-row input { background:transparent; border:none; border-bottom:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:12px; padding:2px 4px; outline:none; color-scheme:dark; }
+  .countdown { font-family:var(--mono); color:var(--red); font-weight:700; }
+
+  .top5 { font-size:13px; line-height:1.55; }
+  .top5 li { margin:0 0 6px 18px; }
+  .footer { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:28px; }
+  .footer a { font-family:var(--mono); font-size:11px; color:var(--muted); text-decoration:none; border:1px solid var(--border); border-radius:20px; padding:6px 12px; }
+  .footer a:hover { color:var(--text); border-color:var(--red); }
+  .tools { display:flex; gap:8px; justify-content:flex-end; margin-bottom:12px; }
+  :focus-visible { outline:2px solid var(--red); outline-offset:2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="logo">Tesla Träumer</div>
+    <h1>Der <span>Plan</span></h1>
+    <div class="subtitle">Model Y Standard · Pearl White · 18"</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-view="plan">Zeitplan</button>
+    <button class="tab" data-view="ub">Übergabe</button>
+  </div>
+
+  <div id="view-plan"></div>
+  <div id="view-ub" style="display:none"></div>
+
+  <div class="footer">
+    <a href="tesla-fund-tracker.html">Tracker</a>
+    <a href="tesla-kosten.html">Kostenbuch</a>
+    <a href="tesla-quests.html">Quests</a>
+  </div>
+</div>
+
+<script>
+var PLAN = [
+ {id:"nov", t:"November 2026 · Bestellen", g:"Bis Ende November bestellt, sobald der Empfehlungscode da ist.", i:[
+  "Empfehlungscode vom Kollegen holen (voraussichtlich Mitte November)",
+  "Aktionen auf tesla.com prüfen: Gilt ein Bonus auch bei Auslieferung 2027?",
+  "Konfiguration final prüfen: Standard RWD, Pearl White, 18 Zoll",
+  "Mit Code bestellen, Anzahlung leisten, Bestätigung ablegen",
+  "Inzahlungnahme Octavia in der App bestätigen, Gültigkeit des Angebots notieren",
+  "Zahlungsart in der App festlegen (Barzahlung)",
+  "Erste Versicherungsangebote einholen (Vollkasko, Annie als Fahrerin, SF-Klasse vom Octavia)"
+ ]},
+ {id:"dez", t:"Dezember 2026 · Vorbereiten", g:"Alles, was nicht von der Fahrgestellnummer abhängt, ist vor Weihnachten erledigt.", i:[
+  "Versicherung entscheiden und Tarif auswählen (eVB kommt im Januar)",
+  "Reifen klären: Was liefert Tesla ab Werk? Bei Sommerreifen den Abholtag flexibel halten",
+  "Steckdose vom Elektriker prüfen lassen (eigener Stromkreis, für Dauerlast geeignet)",
+  "Unterlagen für die Förderung bereitlegen: Richtlinie lesen, Einkommensnachweis heraussuchen",
+  "Zubehör bestellen: Fußmatten, Lehnenschutz, Kofferraum-Kantenschutz, Sprühversiegelung",
+  "Octavia-Sommerräder auf Alufelgen verkaufen (am besten März/April inserieren)"
+ ]},
+ {id:"jan", t:"Januar 2027 · Formalitäten", g:"Sobald Fahrgestellnummer und Termin in der App stehen: alles binnen einer Woche erledigen.", i:[
+  "Fahrgestellnummer und Liefertermin notieren, Termin bei Tageslicht legen",
+  "Wunschkennzeichen FTL beim Landkreis Sächsische Schweiz-Osterzgebirge reservieren (Gültigkeit prüfen)",
+  "eVB beim Versicherer anfordern (Fahrzeugwechsel vom Octavia) und in der App eintragen",
+  "Zulassungsdaten in der App: Wunschkennzeichen, SEPA-Mandat Kfz-Steuer, Ausweis",
+  "Klären, wer den Octavia abmeldet: Tesla oder du selbst",
+  "Inzahlungnahme prüfen: Gilt das Angebot noch? Sonst neu anfragen",
+  "Restzahlung fristgerecht überweisen (2 bis 3 Werktage einplanen)",
+  "Octavia vorbereiten: aussaugen, Sachen raus, Papiere Teil I und II, alle Schlüssel, Serviceheft",
+  "Übergabe-Checkliste aufs Handy (Tab Übergabe)"
+ ]},
+ {id:"feb", t:"Februar 2027 · Übergabewoche", g:"Tesla abholen, Octavia abgeben, alle Mängel dokumentiert.", i:[
+  "Wetterbericht prüfen: Bei Schnee oder Glätte und Sommerreifen den Termin verschieben",
+  "Am Vortag: Zahlung in der App grün, Kennzeichen und Zulassung bestätigt",
+  "Phone Key einrichten, Bluetooth am iPhone an",
+  "Mitnehmen: Ausweis, Octavia-Papiere und -Schlüssel, Kindersitz, Taschenlampe",
+  "Annie mitnehmen: einer prüft außen, einer innen",
+  "Octavia: Kilometerstand fotografieren, Garagentoröffner raus, Übergabeprotokoll mit Kopie",
+  "Tesla nach der Übergabe-Checkliste prüfen, Mängel ins Protokoll und fotografieren",
+  "Erst unterschreiben, wenn alles geprüft ist"
+ ]},
+ {id:"post", t:"Nach der Übergabe · 2 Wochen", g:"Octavia sauber abgeschlossen, Förderung beantragt.", i:[
+  "Innerhalb von 7 Tagen: weitere Mängel in der App melden",
+  "Abmeldung bzw. Umschreibung des Octavia schriftlich bestätigen lassen",
+  "Versicherer: Abgabe Octavia melden, Beitrag zurückfordern",
+  "Kfz-Steuer Octavia: Prüfen, ob die Erstattung eingeht",
+  "Förderantrag stellen (Frist und Unterlagen laut Richtlinie)",
+  "THG-Quote 2027 beantragen",
+  "Handwäsche und Sprühversiegelung, keine Bürstenwaschanlage",
+  "Tesla-Tracker starten: Kilometerstand bei Abholung eintragen"
+ ]}
+];
+var WARN = {"feb-0":1,"jan-6":1,"post-0":1,"post-1":1};
+var UB = [{"t": "1. Vor dem Termin", "i": [{"a": "Termin bei Tageslicht legen, nicht bei Regen", "b": "Bei Dunkelheit oder nassem Lack siehst du Kratzer und Dellen nicht. Notfalls Termin verschieben."}, {"a": "Zeit einplanen: mindestens 60–90 Min.", "b": "Nicht hetzen lassen. Du unterschreibst erst, wenn du fertig bist."}, {"a": "Ausweis, Bestellbestätigung, Zahlungsnachweis", "b": "Restzahlung muss vorher bei Tesla eingegangen sein (meist Überweisung einige Tage vorher)."}, {"a": "eVB-Nummer der Versicherung in der App hinterlegt", "b": "Ohne eVB keine Zulassung. Vollkasko für Neuwagen empfehlenswert."}, {"a": "Wunschkennzeichen FTL reserviert, Daten an Tesla", "b": "Tesla lässt i. d. R. selbst zu. Prüfen, ob das Wunschkennzeichen übernommen wurde."}, {"a": "Octavia: Fahrzeugschein + Brief (ZB I + II), alle Schlüssel, Serviceheft", "b": "Inzahlungnahme-Preis (8.900 €) gilt nur bei Zustand wie angegeben. Vorher aussaugen, persönliche Sachen raus, Garagentor-Fernbedienung raus."}, {"a": "Tesla-App: Fahrzeug im Konto sichtbar, Phone Key vorbereitet", "b": "Bluetooth und Standort auf dem iPhone für die App aktiv lassen."}, {"a": "Ausrüstung mitnehmen", "b": "Taschenlampe (Handy reicht nicht immer), Mikrofasertuch, Ladekabel fürs Handy, ausgedruckte Checkliste, optional Lackschichtdickenmessgerät."}, {"a": "Optional: App „Inspect Tesla“ oder diese Liste", "b": "Fotos mit Zeitstempel helfen bei späteren Reklamationen."}]}, {"t": "2. Lack und Karosserie (rundum, langsam)", "i": [{"a": "Lack in Streiflicht prüfen: jede Fläche aus flachem Winkel", "b": "Pearl White verzeiht viel, zeigt aber Einschlüsse, Staubnasen und Polierhologramme. Taschenlampe flach halten."}, {"a": "Dach, Dachkanten und Glasdach-Übergang", "b": "Wird gerne übersehen. Notfalls auf Türschweller schauen lassen oder Handy hochhalten."}, {"a": "Stoßfänger vorne/hinten, Unterkanten, Schweller", "b": "Transportschäden sitzen oft unten. In die Hocke gehen."}, {"a": "Türkanten, Türinnenseiten, Einstiegsleisten", "b": "Lackabplatzer an Kanten sind ein Klassiker."}, {"a": "Spaltmaße: Motorhaube/Frunk, Türen, Heckklappe, Ladeklappe", "b": "Links mit rechts vergleichen. Finger in den Spalt: gleichmäßig? Bündig mit Nachbarblech?"}, {"a": "Dellen: seitlich entlang der Flanken peilen", "b": "Spiegelungen müssen gerade durchlaufen."}, {"a": "Folienreste, Kleber, Polierreste entfernen lassen", "b": "Vor allem an Türgriffen und Scheibenrändern."}, {"a": "Dichtungen sitzen korrekt, nichts gequetscht", "b": "Besonders Türdichtungen oben und an der Heckklappe."}]}, {"t": "3. Glas, Licht, Räder", "i": [{"a": "Frontscheibe: Steinschläge, Kratzer, Einschlüsse", "b": "Im Gegenlicht prüfen. Auch Glasdach von innen und außen."}, {"a": "Seitenscheiben und Heckscheibe ohne Kratzer", "b": "Fenster einmal ganz runter und hoch, damit du die ganze Fläche siehst."}, {"a": "Alle Leuchten: Abblend, Fernlicht, Blinker, Bremslicht, Rückfahr, Nebel", "b": "Bremslicht: jemanden treten lassen oder rückwärts an Glas/Wand stellen. Kondenswasser in Leuchten?"}, {"a": "Lichtleiste vorne und hinten durchgehend", "b": "Ausfälle einzelner Segmente gab es."}, {"a": "18\"-Felgen: Bordsteinkratzer, Aero-Kappen fest", "b": "Alle vier einzeln. Kappen sitzen nur gesteckt und können klappern."}, {"a": "Reifen: richtige Größe, gleiche Marke, DOT-Datum neu", "b": "DOT-Code an der Flanke: die letzten vier Ziffern = Woche/Jahr. Sollte nicht älter als ~1 Jahr sein."}, {"a": "Reifendruck in der App plausibel", "b": "Werte aller vier Räder vergleichen."}, {"a": "Kameras: Linsen sauber, nicht beschlagen", "b": "Frontkamera hinter der Scheibe, Seitenkameras in Kotflügeln/B-Säule, Heckkamera."}]}, {"t": "4. Innenraum", "i": [{"a": "Sitze: Dellen, Druckstellen, Flecken, Nähte", "b": "Bei Juniper-Auslieferungen häufig gemeldet. Stoffbezüge genau ansehen, besonders Wangen."}, {"a": "Rückbank-Sitzkissen richtig eingerastet", "b": "Bekanntes Problem: Polster nicht befestigt. Kräftig dran ziehen, darf sich nicht heben."}, {"a": "Alle Gurte: ziehen, einrasten, Gurtschloss fest", "b": "Lockere Gurtschlösser wurden gemeldet. Rückbank mittig nicht vergessen."}, {"a": "Isofix-Halterungen zugänglich, Kindersitz einmal testweise einbauen", "b": "Am besten den Sitz eures Sohnes mitnehmen. Passt er gut zur Rückenlehne?"}, {"a": "Rücksitze elektrisch umklappen und wieder aufstellen", "b": "Lehnen müssen hörbar und fest einrasten."}, {"a": "Verkleidungen: Säulen, Türpappen, Mittelkonsole fest", "b": "Mit der Hand drücken: knarzt, wackelt, steht etwas über?"}, {"a": "Dachhimmel sauber, ohne Falten oder Abdrücke", "b": "Flecken auf hellem Stoff sind später schwer zu reklamieren."}, {"a": "Teppiche und Kofferraumverkleidung, Unterflurfach", "b": "Unterflur und Frunk öffnen. Ist alles sauber und vollständig?"}, {"a": "Display: keine Pixelfehler, kein Kratzer, Halterung fest", "b": "Weißes und schwarzes Bild (z. B. Toybox) zur Kontrolle."}, {"a": "Geruch: kein Feuchtigkeits- oder Brandgeruch", "b": "Hinweis auf Wasser im Auto oder Elektrik-Thema."}]}, {"t": "5. Funktionen durchklicken", "i": [{"a": "Software-Version notieren", "b": "Steuerung > Software. Falls sehr alt, Update vor Ort anstoßen lassen."}, {"a": "Kilometerstand notieren (Auslieferung meist < 50 km)", "b": "Deutlich mehr? Nachfragen und ins Protokoll."}, {"a": "Phone Key, Keycards (2 Stück) koppeln und testen", "b": "Beide Keycards einzeln am B-Säulen-Leser testen. Annie direkt als zweiten Fahrer anlegen."}, {"a": "Türen: öffnen/schließen alle vier, Schließgeräusch sauber", "b": "Fenster müssen kurz absenken und wieder hochfahren. Klappern beim Schließen notieren."}, {"a": "Notöffnung innen (vorne) finden", "b": "Wichtig fürs Kind: hinten gibt es keine einfache Notentriegelung. Kindersicherung einschalten."}, {"a": "Elektrische Heckklappe und Frunk", "b": "Öffnen, schließen, Höhe einstellen. Klemmschutz testen (sanft)."}, {"a": "Spiegel: einklappen, verstellen, Heizung", "b": ""}, {"a": "Klima, Heizung, Sitzheizung vorne/hinten, Lenkradheizung (falls vorhanden)", "b": "Einmal voll heiß und voll kalt. Gebläse leise?"}, {"a": "Lautsprecher: alle Kanäle", "b": "Audio > Balance/Fader ganz durchziehen. Kein Schnarren."}, {"a": "USB-C vorne und hinten, Wireless Charger, 12V", "b": "Mit eigenem Kabel/Handy testen. USB-Ausfälle wurden gemeldet."}, {"a": "Wischer, Waschanlage, Hupe", "b": ""}, {"a": "Rückfahrkamera, Rundumsicht, Parkassistent", "b": "Meldung „Parkassistent nicht verfügbar“ verschwindet meist nach Neustart (beide Scrolltasten gedrückt halten)."}, {"a": "Lenkstockhebel Blinker/Fernlicht testen", "b": "Haptik ist bekannt etwas billig, aber er darf nicht wackeln."}, {"a": "Ladeklappe öffnet/schließt, Ladeport ohne Beschädigung", "b": "Lichtring am Port leuchtet?"}, {"a": "Mobiler Connector / Ladekabel im Lieferumfang?", "b": "Je nach Bestellung nicht dabei. Prüfen, was in der Bestellung stand."}]}, {"t": "6. Kurze Probefahrt (5–10 Min.)", "i": [{"a": "Langsam über Unebenheiten oder Bordsteinabsenkung", "b": "Bekannt: Klappern/Rasseln vorne links bei niedriger Geschwindigkeit. Fenster runter, hinhören."}, {"a": "Geradeauslauf, Lenkrad steht gerade", "b": "Kurz auf gerader Strecke loslassen (sicher!). Zieht er zur Seite?"}, {"a": "Bremsen und Rekuperation normal, kein Quietschen", "b": ""}, {"a": "Windgeräusche ab ~50 km/h an Türen/Spiegeln", "b": "Pfeifen deutet auf schlecht sitzende Dichtung hin."}, {"a": "Knarzen im Innenraum bei Kurvenfahrt", "b": "Annie oder dein Sohn hinten mitfahren lassen. Hinten hört man anderes als vorne."}]}, {"t": "7. Abschluss und Papiere", "i": [{"a": "Alle Mängel ins Übergabeprotokoll / in die App", "b": "Konkret mit Position. Nicht nur mündlich zusagen lassen."}, {"a": "Fotos von jedem Mangel mit Datum", "b": "Plus ein Rundum-Video des Autos vor Abfahrt."}, {"a": "Kleine Kratzer: vor Ort polieren lassen", "b": "Tesla macht das oft direkt. Ergebnis dann nochmal ansehen."}, {"a": "Fahrzeugschein, Kennzeichen, COC-Papiere, Garantieinfos", "b": "COC brauchst du ggf. für Versicherung und Förderantrag."}, {"a": "Inzahlungnahme Octavia: Übergabeprotokoll mit km-Stand", "b": "Kopie mitnehmen. Abmeldung durch Tesla bestätigt?"}, {"a": "Erst unterschreiben, wenn du fertig bist", "b": "Mängel bei der Übergabe verhindern nicht die Abnahme, aber sie müssen dokumentiert sein."}]}, {"t": "8. Die ersten 7 Tage", "i": [{"a": "Weitere Mängel in der Tesla-App melden (Service > Anfrage)", "b": "Tesla gibt i. d. R. 7 Tage, um zusätzliche Auslieferungsmängel zu melden. Danach läuft es über Garantie."}, {"a": "Lack in Ruhe zu Hause bei Sonne nochmal prüfen", "b": "Nach der ersten Wäsche sieht man mehr."}, {"a": "Förderantrag nach Zulassung stellen", "b": "Frist und Unterlagen prüfen. 36 Monate Haltedauer beachten."}, {"a": "THG-Quote beantragen", "b": "Jährlich, über einen Anbieter deiner Wahl. Fahrzeugschein-Foto reicht."}, {"a": "Versiegelung auftragen (Sprühversiegelung, später ggf. Keramik)", "b": "Erst nach gründlicher Handwäsche. Keine Waschanlage mit Bürsten in den ersten Wochen."}, {"a": "Zubehör montieren: Matten, Rückenlehnenschutz, Kofferraumkantenschutz", "b": "Gegen Kinderfüße und Kratzer am weißen Ladekantenbereich."}, {"a": "Laden zu Hause testen (Schuko, 8–10 A), LFP auf 100 % einstellen", "b": "Einmal pro Woche auf 100 % hilft bei LFP für korrekte Reichweitenanzeige."}, {"a": "Kindersicherung und Kindermodus einrichten", "b": "Fenster und Türen hinten sperren."}, {"a": "Sentry Mode und Dashcam: USB-Stick einrichten", "b": "Bei Parkremplern Gold wert."}]}];
+
+var KEY = "tf-plan";
+var S = {checked:{}, custom:{}, collapsed:{}, date:"2027-02-15", view:"plan"};
+try { var raw = localStorage.getItem(KEY); if (raw) { var p = JSON.parse(raw); for (var k in p) S[k] = p[k]; } } catch(e) {}
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} }
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+
+function planPhases(){
+  return PLAN.map(function(ph){
+    var items = ph.i.map(function(t, n){ return {id:ph.id+"-"+n, a:t}; });
+    (S.custom[ph.id] || []).forEach(function(c){ items.push({id:c.id, a:c.a, custom:true}); });
+    return {id:ph.id, t:ph.t, g:ph.g, items:items};
+  });
+}
+function ubPhases(){
+  return UB.map(function(s, si){
+    return {id:"ub"+si, t:s.t, items:s.i.map(function(it, n){ return {id:"ub"+si+"-"+n, a:it.a, b:it.b}; })};
+  });
+}
+
+function render(){
+  document.querySelectorAll(".tab").forEach(function(b){ b.classList.toggle("active", b.dataset.view === S.view); });
+  document.getElementById("view-plan").style.display = S.view === "plan" ? "" : "none";
+  document.getElementById("view-ub").style.display = S.view === "ub" ? "" : "none";
+  renderList("view-plan", planPhases(), true);
+  renderList("view-ub", ubPhases(), false);
+}
+
+function renderList(el, phases, isPlan){
+  var total = 0, done = 0, next = null;
+  phases.forEach(function(ph){ ph.items.forEach(function(it){ total++; if (S.checked[it.id]) done++; else if (!next) next = {it:it, ph:ph}; }); });
+  var pct = total ? Math.round(done/total*100) : 0;
+  var h = '<div class="card"><div class="total"><div><div class="total-num">'+done+' / '+total+'</div><div class="total-lbl">'+(isPlan?'Aufgaben erledigt':'Punkte geprüft')+'</div></div><div class="total-num">'+pct+'%</div></div>';
+  h += '<div class="bar'+(pct===100?' done':'')+'"><div style="width:'+pct+'%"></div></div>';
+  if (isPlan) {
+    var days = Math.ceil((new Date(S.date+"T12:00:00") - new Date())/86400000);
+    h += '<div class="date-row"><span>Liefertermin <input type="date" id="d" value="'+esc(S.date)+'"></span><span class="countdown">'+(days>0?'noch '+days+' Tage':(days===0?'heute!':'geliefert'))+'</span></div>';
+  }
+  h += '<div class="next">'+(next ? 'Als Nächstes: <b>'+esc(next.it.a)+'</b>' : 'Alles erledigt.')+'</div></div>';
+
+  if (!isPlan) {
+    h += '<div class="card"><div class="phase-title" style="margin-bottom:10px">Die fünf wichtigsten Punkte</div><ol class="top5">'+
+      '<li>Bei Tageslicht und trocken übernehmen.</li><li>Rückbank-Polster, Gurtschlösser und Sitze auf Dellen prüfen.</li>'+
+      '<li>Langsam über eine Unebenheit fahren, vorne links hinhören.</li><li>Jeden Mangel ins Protokoll und fotografieren.</li>'+
+      '<li>7 Tage nach Übergabe weitere Mängel in der App melden.</li></ol></div>';
+  }
+
+  phases.forEach(function(ph){
+    var c = 0; ph.items.forEach(function(it){ if (S.checked[it.id]) c++; });
+    var complete = c === ph.items.length && c > 0;
+    var p = ph.items.length ? Math.round(c/ph.items.length*100) : 0;
+    var collapsed = S.collapsed[ph.id] !== undefined ? S.collapsed[ph.id] : (isPlan ? complete : false);
+    h += '<div class="card phase'+(complete?' complete':'')+(collapsed?' collapsed':'')+'">';
+    h += '<div class="phase-head" data-toggle="'+ph.id+'" role="button" tabindex="0" aria-expanded="'+!collapsed+'"><div class="phase-title">'+esc(ph.t)+'</div><div class="phase-meta">'+c+'/'+ph.items.length+' <span class="chev">▾</span></div></div>';
+    h += '<div class="bar'+(complete?' done':'')+'"><div style="width:'+p+'%"></div></div>';
+    h += '<div class="phase-body">';
+    if (ph.g) h += '<div class="phase-goal">'+esc(ph.g)+'</div>';
+    ph.items.forEach(function(it){
+      h += '<div class="item'+(S.checked[it.id]?' checked':'')+(WARN[it.id]?' warn':'')+'" data-id="'+it.id+'" role="checkbox" tabindex="0" aria-checked="'+!!S.checked[it.id]+'"><div class="box"></div><div><div class="item-text">'+esc(it.a)+'</div>'+(it.b?'<div class="item-sub">'+esc(it.b)+'</div>':'')+'</div>'+(it.custom?'<button class="del" data-del="'+ph.id+'|'+it.id+'" aria-label="Löschen">×</button>':'')+'</div>';
+    });
+    if (isPlan) h += '<div class="add"><input placeholder="Eigene Aufgabe …" data-addin="'+ph.id+'"><button data-add="'+ph.id+'">+</button></div>';
+    h += '</div></div>';
+  });
+  h += '<div class="tools"><button class="btn ghost" data-reset="'+(isPlan?'plan':'ub')+'">'+(isPlan?'Häkchen zurücksetzen':'Checkliste zurücksetzen')+'</button></div>';
+  document.getElementById(el).innerHTML = h;
+}
+
+document.addEventListener("click", function(e){
+  var t = e.target;
+  if (t.closest(".tab")) { S.view = t.closest(".tab").dataset.view; save(); render(); window.scrollTo(0,0); return; }
+  if (t.dataset.del) { var d = t.dataset.del.split("|"); S.custom[d[0]] = (S.custom[d[0]]||[]).filter(function(c){ return c.id !== d[1]; }); delete S.checked[d[1]]; save(); render(); return; }
+  if (t.dataset.add) { addItem(t.dataset.add); return; }
+  if (t.dataset.reset) {
+    var pre = t.dataset.reset === "ub" ? "ub" : null;
+    if (!confirmReset()) return;
+    for (var k in S.checked) { if (pre ? k.indexOf("ub") === 0 : k.indexOf("ub") !== 0) delete S.checked[k]; }
+    save(); render(); return;
+  }
+  var head = t.closest("[data-toggle]");
+  if (head) { var id = head.dataset.toggle; var el = head.parentNode; S.collapsed[id] = !el.classList.contains("collapsed"); save(); render(); return; }
+  var item = t.closest(".item");
+  if (item) { var iid = item.dataset.id; if (S.checked[iid]) delete S.checked[iid]; else S.checked[iid] = Date.now(); save(); render(); }
+});
+document.addEventListener("keydown", function(e){
+  if (e.key === "Enter" && e.target.dataset && e.target.dataset.addin) { addItem(e.target.dataset.addin); return; }
+  if ((e.key === "Enter" || e.key === " ") && (e.target.classList.contains("item") || e.target.dataset.toggle)) { e.preventDefault(); e.target.click(); }
+});
+document.addEventListener("change", function(e){ if (e.target.id === "d") { S.date = e.target.value; save(); render(); } });
+
+var resetArmed = 0;
+function confirmReset(){
+  // zweimal tippen statt Browser-Dialog
+  var now = Date.now();
+  if (now - resetArmed < 3000) { resetArmed = 0; return true; }
+  resetArmed = now;
+  document.querySelectorAll("[data-reset]").forEach(function(b){ b.textContent = "Nochmal tippen zum Bestätigen"; });
+  setTimeout(render, 3000);
+  return false;
+}
+function addItem(ph){
+  var inp = document.querySelector('[data-addin="'+ph+'"]');
+  var v = inp && inp.value.trim(); if (!v) return;
+  (S.custom[ph] = S.custom[ph] || []).push({id:"c"+Date.now(), a:v});
+  save(); render();
+  var again = document.querySelector('[data-addin="'+ph+'"]'); if (again) again.focus();
+}
+render();
+</script>
+</body>
+</html>
